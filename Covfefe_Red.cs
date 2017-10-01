@@ -1,216 +1,240 @@
-﻿using System.Collections;
+﻿//#define DEBUGLOG
+
+using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
+
 //---------- CHANGE THIS NAME HERE -------
 public class Covfefe_Red : MonoBehaviour
 {
-    //private Vector3 position = new Vector3(20.0f, 0.0f, 20.0f);
+	//---------- CHANGE THIS NAME HERE -------
+	public static Covfefe_Red AddYourselfTo(GameObject host)
+	{
+		//---------- CHANGE THIS NAME HERE -------
+		return host.AddComponent<Covfefe_Red>();
+	}
 
-    /// <summary>
-    /// DO NOT MODIFY THIS! 
-    /// vvvvvvvvv
-    /// </summary>
-    [SerializeField]
-    public CharacterScript character1;
-    [SerializeField]
-    public CharacterScript character2;
-    [SerializeField]
-    public CharacterScript character3;
-    /// <summary>
-    /// ^^^^^^^^
-    /// </summary>
-    /// 
+	/*vvvv DO NOT MODIFY vvvvv*/
+	[SerializeField]
+	public CharacterScript character1;
+	[SerializeField]
+	public CharacterScript character2;
+	[SerializeField]
+	public CharacterScript character3;
 
+	private const int CHARACTER_STATE_FREE = 0;
+	private const int CHARACTER_STATE_OBJECTIVE_PURSUIT = 1;
+	private const int CHARACTER_STATE_ENEMY_PURSUIT = 2;
+	private const int CHARACTER_STATE_WANDERING = 3;
 
-    // USEFUL VARIABLES
-    private ObjectiveScript middleObjective;
-    private ObjectiveScript leftObjective;
-    private ObjectiveScript rightObjective;
-    private float timer = 0;
+	class MyCharacter
+	{
+		public CharacterScript character;
+		public int state;
+		public Vector3 wanderDest;
+		public MyObjective objectiveDest;
+		public GameObject itemDest;
 
-    private team ourTeamColor;
-    //---------- CHANGE THIS NAME HERE -------
-    public static Covfefe_Red AddYourselfTo(GameObject host)
-    {
-        //---------- CHANGE THIS NAME HERE -------
-        return host.AddComponent<Covfefe_Red>();
-    }
+		public void Reset()
+		{
+			state = CHARACTER_STATE_FREE;
+			if (objectiveDest != null)
+				objectiveDest.Reset();
+			objectiveDest = null;
+			itemDest = null;
+		}
+	}
 
-    void Start()
-    {
-        // Set up code. This populates your characters with their controlling scripts
-        character1 = transform.Find("Character1").gameObject.GetComponent<CharacterScript>();
-        character2 = transform.Find("Character2").gameObject.GetComponent<CharacterScript>();
-        character3 = transform.Find("Character3").gameObject.GetComponent<CharacterScript>();
+	class MyObjective
+	{
+		public ObjectiveScript objective;
+		public MyCharacter pursuer;
 
-        // populate the objectives
-        middleObjective = GameObject.Find("MiddleObjective").GetComponent<ObjectiveScript>();
-        leftObjective = GameObject.Find("LeftObjective").GetComponent<ObjectiveScript>();
-        rightObjective = GameObject.Find("RightObjective").GetComponent<ObjectiveScript>();
+		public void Reset()
+		{
+			pursuer = null;
+		}
+	}
 
-        // save our team, changes every time
-        ourTeamColor = character1.getTeam();
-        //Makes gametimer call every second
-        InvokeRepeating("gameTimer", 0.0f, 1.0f);
+	readonly List<MyCharacter> characters = new List<MyCharacter>(3);
+	readonly List<MyObjective> objectives = new List<MyObjective>(3);
 
-    }
+	private ObjectiveScript middleObjective;
+	private ObjectiveScript leftObjective;
+	private ObjectiveScript rightObjective;
 
-    List<CharacterScript> team = new List<CharacterScript>();
-    List<ObjectiveScript> objectives = new List<ObjectiveScript>();
-    Vector3 teamTarget;
-    ObjectiveScript targetObjective;
+	private team ourTeam;
 
-    void Update()
-    {
-        var teamBases = new Vector3[]
-        {
-            new Vector3(-46.2f, 0.3f, 20.3f), 
-            new Vector3(46.2f, 0.3f, -20.3f), 
-        };
-        var enemyBase = ourTeamColor == global::team.red ? teamBases[(int)global::team.blue] : teamBases[(int)global::team.red];
+	private Vector3 min, max;
 
-        if (team.Count == 0)
-        {
-            team.Add(character1);
-            team.Add(character2);
-            team.Add(character3);
-        }
+	private readonly Dictionary<GameObject, MyCharacter> itemPursuers = new Dictionary<GameObject, MyCharacter>();
 
-        if (objectives.Count == 0)
-        {
-            objectives.Add(leftObjective);
-            objectives.Add(middleObjective);
-            objectives.Add(rightObjective);
-        }
+	void Start()
+	{
+		character1 = transform.Find("Character1").gameObject.GetComponent<CharacterScript>();
+		characters.Add(new MyCharacter { character = character1 });
+		character2 = transform.Find("Character2").gameObject.GetComponent<CharacterScript>();
+		characters.Add(new MyCharacter { character = character2 });
+		character3 = transform.Find("Character3").gameObject.GetComponent<CharacterScript>();
+		characters.Add(new MyCharacter { character = character3 });
 
-        var teamPos = Vector3.zero;
-        team.ForEach(c => teamPos += c.getPrefabObject().transform.position);
-        teamPos /= team.Count;
+		middleObjective = GameObject.Find("MiddleObjective").GetComponent<ObjectiveScript>();
+		objectives.Add(new MyObjective { objective = middleObjective });
+		leftObjective = GameObject.Find("LeftObjective").GetComponent<ObjectiveScript>();
+		objectives.Add(new MyObjective { objective = leftObjective });
+		rightObjective = GameObject.Find("RightObjective").GetComponent<ObjectiveScript>();
+		objectives.Add(new MyObjective { objective = rightObjective });
 
-        //Set caracter loadouts, can only happen when the characters are at base.
-        team.ForEach(c =>
-        {
-            switch (c.getZone())
-            {
-                case zone.BlueBase:
-                case zone.RedBase:
-                    c.setLoadout(loadout.SHORT);
-                    break;
-            }
-        });
+		min = Vector3.one * Mathf.Infinity;
+		max = Vector3.one * Mathf.NegativeInfinity;
+		foreach (var objective in objectives)
+		{
+			min = Vector3.Min(min, objective.objective.getObjectiveLocation());
+			max = Vector3.Max(max, objective.objective.getObjectiveLocation());
+		}
 
-        var nonOwnedObjectives = objectives.Select(o => o.getControllingTeam() != ourTeamColor ? o : null);
-        ObjectiveScript objective = null;
+		ourTeam = character1.getTeam();
+	}
+	/*^^^^ DO NOT MODIFY ^^^^*/
 
-        if (nonOwnedObjectives.Any())
-        {
-            foreach (var nonOwnedObjective in nonOwnedObjectives)
-            {
-                if (nonOwnedObjective)
-                {
-                    if (objective == null || Vector3.Distance(nonOwnedObjective.getObjectiveLocation(), teamPos) < Vector3.Distance(objective.getObjectiveLocation(), teamPos))
-                        objective = nonOwnedObjective;
-                }
-            }
-            //nonOwnedObjectives.ElementAt(Random.Range(0, nonOwnedObjectives.Count()));
-        }
+	/* Your code below this line */
+	// Update() is called every frame
+	void Update()
+	{
+#if DEBUGLOG
+		Debug.Log("start");
+#endif
 
-        if (targetObjective && targetObjective.getControllingTeam() == ourTeamColor)
-            targetObjective = null;
+		foreach (var character in characters)
+		{
+			character.character.setLoadout(loadout.LONG);
+			var charPos = character.character.getPrefabObject().transform.position;
+			if (character.character.visibleEnemyLocations.Count > 0)
+			{
+				character.character.SetFacing(character.character.visibleEnemyLocations.First());
+			}
+			else
+			{
+				var rotation = character.character.getPrefabObject().transform.rotation;
+				var direction = rotation * (Quaternion.AngleAxis(25, Vector3.up) * Vector3.back * 10);
+				character.character.SetFacing(charPos + direction);
+			}
 
-        if (objective && (targetObjective == null || Vector3.Distance(objective.getObjectiveLocation(), teamPos) < Vector3.Distance(targetObjective.getObjectiveLocation(), teamPos)))
-            targetObjective = objective;
+			if (character.character.getHP() <= 0)
+			{
+#if DEBUGLOG
+				Debug.Log(character.character.name + " dead");
+#endif
+				character.Reset();
+			}
 
-        var objectiveLocation = targetObjective != null ? targetObjective.getObjectiveLocation() : enemyBase;
-        teamTarget = character1.FindClosestCover(objectiveLocation);
+#if DEBUGLOG
+			Debug.Log("switch");
+#endif
+			switch (character.state)
+			{
+				case CHARACTER_STATE_FREE:
+					break;
+				case CHARACTER_STATE_OBJECTIVE_PURSUIT:
+					if (character.objectiveDest.objective.getControllingTeam() == ourTeam)
+					{
+						character.objectiveDest.Reset();
+						character.Reset();
+					}
+					break;
+				case CHARACTER_STATE_WANDERING:
+					if (GetObjectiveTarget() != null || CharacterNearDestination(character, character.wanderDest))
+					{
+						Debug.Log("donewander");
+						if (character.itemDest)
+							itemPursuers.Remove(character.itemDest);
+						character.Reset();
+					}
+					break;
+			}
+		}
 
-        if (Vector3.Distance(teamPos, objectiveLocation) < Vector3.Distance(teamTarget, objectiveLocation)
-            || Vector3.Distance(teamTarget, objectiveLocation) < 25f)
-            teamTarget = objectiveLocation;
-        //Debug.Log(targetObjective + " " + teamTarget + " " + objectiveLocation);
+#if DEBUGLOG
+		Debug.Log("decide");
+#endif
+		foreach (var character in characters)
+		{
+			if (character.character.getHP() <= 0)
+				continue;
 
-        Vector3? enemyLocation = null;
-        team.ForEach(c =>
-        {
-            if (c.attackedFromLocations.Count > 0)
-                enemyLocation = c.attackedFromLocations[0];
-            else if (c.visibleEnemyLocations.Count > 0)
-                enemyLocation = c.visibleEnemyLocations[0];
+			switch (character.state)
+			{
+				case CHARACTER_STATE_FREE:
+					Debug.Log(character.character + " free");
+					var objective = GetObjectiveTarget();
+					Debug.Log(objective);
+					if (objective != null)
+					{
+						Debug.Log(character.character.name + " get objective " + objective.objective.name);
+						character.character.MoveChar(objective.objective.getObjectiveLocation() + Random.onUnitSphere * 4);
+						character.state = CHARACTER_STATE_OBJECTIVE_PURSUIT;
+						character.objectiveDest = objective;
+						objective.pursuer = character;
+					}
+					else
+					{
+						Debug.Log(character.character.name + " wander");
+						var item = character.character.FindClosestItem();
+						if (item && !itemPursuers.ContainsKey(item))
+						{
+							itemPursuers[item] = character;
+							character.wanderDest = item.transform.position;
+						}
+						else
+						{
+							character.wanderDest = new Vector3(Random.Range(min.x, max.x), Random.Range(min.y, max.y), Random.Range(min.z, max.z));
+						}
 
-            c.attackedFromLocations.Clear();
-        });
+						character.character.MoveChar(character.wanderDest);
+						character.state = CHARACTER_STATE_WANDERING;
+					}
+					break;
+				case CHARACTER_STATE_OBJECTIVE_PURSUIT:
 
-        if (enemyLocation.HasValue)
-            teamTarget = enemyLocation.Value;
+					break;
+			}
+		}
+	}
 
-        for (int i = 0; i < team.Count; i++)
-        {
-            var c = team[i];
+	MyCharacter GetFreePlayer()
+	{
+		foreach (var character in characters)
+		{
+			if (character.state == CHARACTER_STATE_FREE)
+			{
+				return character;
+			}
+		}
 
-            var angle = 360f * ((float)i / team.Count);
-            var facing = Quaternion.AngleAxis(angle, Vector3.up) * Vector3.right;
-            c.MoveChar(teamTarget + facing * 2f);
+		return null;
+	}
 
-            var faceTarget = enemyLocation ?? teamPos + /*Quaternion.AngleAxis(Time.time * 100f, Vector3.up) **/ facing;
-            c.SetFacing(faceTarget);
-        }
+	MyObjective GetObjectiveTarget()
+	{
+		foreach (var objective in objectives)
+		{
+			if (objective.objective.getControllingTeam() != ourTeam && objective.pursuer == null)
+				return objective;
+		}
 
-        //team.ForEach(c => c.MoveChar(c.transform.position));
+		foreach (var objective in objectives)
+		{
+			if (objective.objective.getControllingTeam() != ourTeam)
+				return objective;
+		}
 
-        // in the first couple of seconds we just scan around
-        //if (timer < 10)
-        //{
-        //    character1.FaceClosestWaypoint();
-        //    character2.FaceClosestWaypoint();
-        //    character3.FaceClosestWaypoint();
-        //    character1.MoveChar(new Vector3(-8.8f, 1.5f, 13.5f));
-        //}
+		return null;
+	}
 
-        //// place sniper in position, run to cover if attacked
-        //if (character1.attackedFromLocations.Capacity == 0)
-        //{
-        //    character1.MoveChar(new Vector3(-8.8f, 1.5f, 13.5f));
-        //    character1.SetFacing(middleObjective.transform.position);
-        //}
-        //else
-        //{
-        //    character1.MoveChar(character1.FindClosestCover(character1.attackedFromLocations[0]));
-        //}
-        //// send other two to capture
-        //if (middleObjective.getControllingTeam() != character1.getTeam())
-        //{
-        //    character2.MoveChar(middleObjective.transform.position);
-        //    character2.SetFacing(middleObjective.transform.position);
-        //    character3.MoveChar(middleObjective.transform.position);
-        //    character3.SetFacing(middleObjective.transform.position);
-        //}
-        //else
-        //{
-        //    // Then left
-        //    if (leftObjective.getControllingTeam() != character1.getTeam())
-        //    {
-        //        character2.MoveChar(leftObjective.transform.position);
-        //        character2.SetFacing(leftObjective.transform.position);
-        //        character3.MoveChar(leftObjective.transform.position);
-        //        character3.SetFacing(leftObjective.transform.position);
-        //    }
-        //    // Then RIght
-        //    if (rightObjective.getControllingTeam() != character1.getTeam())
-        //    {
-        //        character2.MoveChar(rightObjective.transform.position);
-        //        character2.SetFacing(rightObjective.transform.position);
-        //        character3.MoveChar(rightObjective.transform.position);
-        //        character3.SetFacing(rightObjective.transform.position);
-        //    }
-        //}
-    }
-
-    // a simple function to track game time
-    public void gameTimer()
-    {
-        timer += 1;
-    }
-
+	bool CharacterNearDestination(MyCharacter character, Vector3 destination)
+	{
+		var characterPos = character.character.getPrefabObject().transform.position;
+		return Vector3.Distance(characterPos, destination) < 2.5f;
+	}
 }
-
