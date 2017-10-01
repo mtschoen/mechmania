@@ -33,6 +33,7 @@ public class Covfefe_Blue : MonoBehaviour
 		public int state;
 		public Vector3 wanderDest;
 		public MyObjective objectiveDest;
+		public GameObject itemDest;
 
 		public void Reset()
 		{
@@ -40,6 +41,7 @@ public class Covfefe_Blue : MonoBehaviour
 			if (objectiveDest != null)
 				objectiveDest.Reset();
 			objectiveDest = null;
+			itemDest = null;
 		}
 	}
 
@@ -144,6 +146,8 @@ public class Covfefe_Blue : MonoBehaviour
 					if (GetObjectiveTarget() != null || CharacterNearDestination(character, character.wanderDest))
 					{
 						Debug.Log("donewander");
+						if (character.itemDest)
+							itemPursuers.Remove(character.itemDest);
 						character.Reset();
 					}
 					break;
