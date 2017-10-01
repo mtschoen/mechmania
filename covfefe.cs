@@ -6,12 +6,12 @@ using System.Linq;
 using UnityEngine;
 
 //---------- CHANGE THIS NAME HERE -------
-public class Covfefe_Blue : MonoBehaviour
+public class covfefe : MonoBehaviour
 {
     //---------- CHANGE THIS NAME HERE -------
-    public static Covfefe_Blue AddYourselfTo(GameObject host) {
+    public static covfefe AddYourselfTo(GameObject host) {
         //---------- CHANGE THIS NAME HERE -------
-        return host.AddComponent<Covfefe_Blue>();
+        return host.AddComponent<covfefe>();
     }
 
     /*vvvv DO NOT MODIFY vvvvv*/
