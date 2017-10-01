@@ -3,6 +3,7 @@
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
+using Mono.CSharp;
 using UnityEngine;
 
 //---------- CHANGE THIS NAME HERE -------
@@ -104,20 +105,53 @@ public class covfefe : MonoBehaviour
 #if DEBUGLOG
 		Debug.Log("start");
 #endif
+	    Vector3 groupCenter = Vector3.zero;
+	    foreach (var character in characters)
+	    {
+	        groupCenter += character.character.getPrefabObject().transform.position;
+	    }
+	    groupCenter /= characters.Count;
 
-		foreach (var character in characters)
+	    float totalCharacterDistance = 0f;
+	    foreach (var character in characters)
+	    {
+	        totalCharacterDistance += Vector3.Distance(character.character.getPrefabObject().transform.position, groupCenter);
+	    }
+
+	    Vector3? visibleEnemyLocation = null;
+	    foreach (var character in characters)
+	    {
+	        if (character.character.visibleEnemyLocations.Count > 0)
+	        {
+	            visibleEnemyLocation = character.character.visibleEnemyLocations.First();
+	        }
+	    }
+		
+        //Debug.Log(totalCharacterDistance);
+
+	    foreach (var character in characters)
 		{
 			character.character.setLoadout(loadout.LONG);
 			var charPos = character.character.getPrefabObject().transform.position;
 			if (character.character.visibleEnemyLocations.Count > 0)
 			{
-				character.character.SetFacing(character.character.visibleEnemyLocations.First());
+			    if (totalCharacterDistance < 10f && visibleEnemyLocation.HasValue)
+			        character.character.SetFacing(visibleEnemyLocation.Value);
+                else
+				    character.character.SetFacing(character.character.visibleEnemyLocations.First());
 			}
 			else
 			{
 				var rotation = character.character.getPrefabObject().transform.rotation;
 				var direction = rotation * (Quaternion.AngleAxis(25, Vector3.up) * Vector3.back * 10);
-				character.character.SetFacing(charPos + direction);
+
+			    if (totalCharacterDistance < 10f)
+			    {
+			        var angle = 360f * ((float)characters.IndexOf(character) / characters.Count);
+			        direction = Quaternion.AngleAxis(angle, Vector3.up) * Vector3.right;
+			    }
+
+			    character.character.SetFacing(charPos + direction);
 			}
 
 			if (character.character.getHP() <= 0)
@@ -145,7 +179,6 @@ public class covfefe : MonoBehaviour
 				case CHARACTER_STATE_WANDERING:
 					if (GetObjectiveTarget() != null || CharacterNearDestination(character, character.wanderDest))
 					{
-						Debug.Log("donewander");
 						if (character.itemDest)
 							itemPursuers.Remove(character.itemDest);
 						character.Reset();
@@ -165,12 +198,9 @@ public class covfefe : MonoBehaviour
 			switch (character.state)
 			{
 				case CHARACTER_STATE_FREE:
-					Debug.Log(character.character + " free");
 					var objective = GetObjectiveTarget();
-					Debug.Log(objective);
 					if (objective != null)
 					{
-						Debug.Log(character.character.name + " get objective " + objective.objective.name);
 						character.character.MoveChar(objective.objective.getObjectiveLocation() + Random.onUnitSphere * 4);
 						character.state = CHARACTER_STATE_OBJECTIVE_PURSUIT;
 						character.objectiveDest = objective;
@@ -178,7 +208,6 @@ public class covfefe : MonoBehaviour
 					}
 					else
 					{
-						Debug.Log(character.character.name + " wander");
 						var item = character.character.FindClosestItem();
 						if (item && !itemPursuers.ContainsKey(item))
 						{
