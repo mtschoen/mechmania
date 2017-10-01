@@ -30,10 +30,10 @@ public class Covfefe_Red : MonoBehaviour
 
     private team ourTeamColor;
     //---------- CHANGE THIS NAME HERE -------
-    public static TEAM_RED_SCRIPT AddYourselfTo(GameObject host)
+    public static Covfefe_Red AddYourselfTo(GameObject host)
     {
         //---------- CHANGE THIS NAME HERE -------
-        return host.AddComponent<TEAM_RED_SCRIPT>();
+        return host.AddComponent<Covfefe_Red>();
     }
 
     void Start()
